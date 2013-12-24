@@ -24,7 +24,9 @@ setup :: Sandbox ()
 setup = do
   -- Register index server
   rootDir <- liftIO getFlareRoot
-  let flareiBin = rootDir </> "src" </> "flarei" </> "flarei"
+  let flareiBin = case rootDir of
+                    Just v -> v </> "src" </> "flarei" </> "flarei"
+                    Nothing -> "/usr" </> "local" </> "bin" </> "flarei"
   dataDir <- getDataDir
   flareiPort <- getPort "flarei"
   register "flarei" flareiBin [ "--data-dir", dataDir
@@ -34,7 +36,9 @@ setup = do
                               , "--monitor-threshold", "2"
                               ] def
   -- Register daemons
-  let flaredBin = rootDir </> "src" </> "flared" </> "flared"
+  let flaredBin = case rootDir of
+                    Just v -> v </> "src" </> "flared" </> "flared"
+                    Nothing -> "/usr" </> "local" </> "bin" </> "flared"
   setVariable "flared_bin" flaredBin
   daemons <- setVariable "daemons" [ FlareDaemon 0 Master
                                    , FlareDaemon 0 (Slave 0)
@@ -135,14 +139,14 @@ setupFlareCluster = withTimeout 1000 $ do
   yieldProgress "Wait 2s"
   liftIO $ threadDelay 2000000
 
-getFlareRoot :: IO FilePath
+getFlareRoot :: IO (Maybe FilePath)
 getFlareRoot = do
   binDir <- getBinDir
   cs <- getRootCandidates
   cs' <- filterM isFlareRoot cs
   case cs' of
-    c:_ -> return c
-    _ -> return $ binDir </> ".." </> ".." </> "flare"
+    c:_ -> return $ Just (c </> "flare")
+    _ -> return Nothing
 
 getRootCandidates :: IO [FilePath]
 getRootCandidates = do
