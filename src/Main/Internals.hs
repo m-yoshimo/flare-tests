@@ -23,8 +23,8 @@ import Paths_flare_tests (getBinDir)
 setup :: Sandbox ()
 setup = do
   -- Register index server
-  binDir <- liftIO getBinDir
-  let flareiBin = binDir </> ".." </> ".." </> "flare" </> "src" </> "flarei" </> "flarei"
+  rootDir <- liftIO getFlareRoot
+  let flareiBin = rootDir </> "src" </> "flarei" </> "flarei"
   dataDir <- getDataDir
   flareiPort <- getPort "flarei"
   register "flarei" flareiBin [ "--data-dir", dataDir
@@ -34,7 +34,8 @@ setup = do
                               , "--monitor-threshold", "2"
                               ] def
   -- Register daemons
-  setVariable "flared_bin" $ binDir </> ".." </> ".." </> "flare" </> "src" </> "flared" </> "flared"
+  let flaredBin = rootDir </> "src" </> "flared" </> "flared"
+  setVariable "flared_bin" flaredBin
   daemons <- setVariable "daemons" [ FlareDaemon 0 Master
                                    , FlareDaemon 0 (Slave 0)
                                    , FlareDaemon 0 (Slave 1)
@@ -133,3 +134,29 @@ setupFlareCluster = withTimeout 1000 $ do
   mapM_ setupFlareDaemon daemons
   yieldProgress "Wait 2s"
   liftIO $ threadDelay 2000000
+
+getFlareRoot :: IO FilePath
+getFlareRoot = do
+  binDir <- getBinDir
+  cs <- getRootCandidates
+  cs' <- filterM isFlareRoot cs
+  case cs' of
+    c:_ -> return c
+    _ -> return $ binDir </> ".." </> ".." </> "flare"
+
+getRootCandidates :: IO [FilePath]
+getRootCandidates = do
+  bindir <- getBinDir
+  cwd <- getCurrentDirectory
+  return [ cwd
+         , takeDirectories 2 bindir
+         , takeDirectories 3 bindir
+         ]
+
+isFlareRoot :: FilePath -> IO Bool
+isFlareRoot baseDir =
+  doesDirectoryExist $ baseDir </> "flare"
+
+takeDirectories :: Int -> FilePath -> FilePath
+takeDirectories n p =
+  if n <= 0 then p else iterate takeDirectory p !! (n - 1)
